@@ -1,0 +1,194 @@
+name: graspologic Build
+
+# CINTENT >> MANUAL_TRIGGER
+# on:
+#   push:
+#     paths-ignore:
+#       - '.all-contributorsrc'
+#       - 'CONTRIBUTORS.md'
+#     branches-ignore:
+#       - 'dev'
+#       - 'main'
+#   pull_request:
+#     paths-ignore:
+#       - '.all-contributorsrc'
+#       - 'CONTRIBUTORS.md'
+#   workflow_call:
+on: [repository_dispatch, workflow_dispatch]
+
+env:
+  PYTHON_VERSION: '3.10'
+  POETRY_VERSION: '1.8.3'
+
+jobs:
+  build-reference-documentation:
+    runs-on: ubuntu-latest
+    steps:
+      - run: sudo apt-get install -y pandoc
+      # CINTENT >> CHANGE_VERSION
+      # - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install Poetry
+        uses: abatilo/actions-poetry@v3.0.0
+        with:
+          poetry-version: $POETRY_VERSION
+
+      # CINTENT >> INSERT_CINTENT
+      - uses: JavidDitty/setup-cintent@3e5b2faf83a2ad32c22a1cd0f86f5f20ea53a5ab
+
+      - name: Install dependencies
+        run: poetry install
+      - name: "Run Reference Documentation Generation"
+        run: |
+          echo "documentation" > dependencies_documentation.txt
+          poetry run pipdeptree >> dependencies_documentation.txt
+          poetry run poe docsWithTutorials
+
+      # CINTENT >> REMOVE_UPLOAD
+      # - name: Archive documentation version artifact
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: dependencies
+      #     path: |
+      #       dependencies_documentation.txt
+
+      # CINTENT >> REMOVE_UPLOAD
+      # - name: Archive documentation artifacts
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: documentation-site
+      #     path: |
+      #       docs/_build/html
+
+      # CINTENT >> INSERT_CINTENT
+      - name: Upload CIntent Artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ env.CINTENT_ARTIFACT_NAME }}
+          path: ${{ env.CINTENT_LOGS }}
+
+  code-format-check:
+    runs-on: ubuntu-latest
+    steps:
+      # CINTENT >> CHANGE_VERSION
+      # - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install Poetry
+        uses: abatilo/actions-poetry@v3.0.0
+        with:
+          poetry-version: $POETRY_VERSION
+
+      # CINTENT >> INSERT_CINTENT
+      - uses: JavidDitty/setup-cintent@3e5b2faf83a2ad32c22a1cd0f86f5f20ea53a5ab
+
+      - name: Install dependencies
+        run: poetry install
+      - name: Run Format Check
+        run: poetry run poe static_checks
+  
+      # CINTENT >> INSERT_CINTENT
+      - name: Upload CIntent Artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ env.CINTENT_ARTIFACT_NAME }}
+          path: ${{ env.CINTENT_LOGS }}
+
+  test-coverage:
+    runs-on: ubuntu-latest
+    steps:
+      # CINTENT >> CHANGE_VERSION
+      # - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install Poetry
+        uses: abatilo/actions-poetry@v3.0.0
+        with:
+          poetry-version: $POETRY_VERSION
+
+      # CINTENT >> INSERT_CINTENT
+      - uses: JavidDitty/setup-cintent@3e5b2faf83a2ad32c22a1cd0f86f5f20ea53a5ab
+
+      - name: Install dependencies
+        run: poetry install
+      - name: Run Test Coverage
+        run: poetry run poe coverage
+
+      # CINTENT >> INSERT_CINTENT
+      - name: Upload CIntent Artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ env.CINTENT_ARTIFACT_NAME }}
+          path: ${{ env.CINTENT_LOGS }}
+
+  unit-and-doc-test:
+    runs-on: ${{matrix.os}}
+    strategy:
+      matrix:
+        # CINTENT >> REMOVE_MATRIX
+        # os: [ubuntu-latest, windows-latest, macos-latest]
+        # python_version: ["3.9", "3.10", "3.11", "3.12"]
+        os: [ubuntu-latest]
+        python_version: ["3.12"]
+      fail-fast: false
+    steps:
+      # CINTENT >> CHANGE_VERSION
+      # - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
+      - name: Set up Python ${{matrix.python_version}} ${{matrix.os}}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{matrix.python_version}}
+      - name: Install Poetry
+        uses: abatilo/actions-poetry@v3.0.0
+        with:
+          poetry-version: $POETRY_VERSION
+
+      # CINTENT >> INSERT_CINTENT
+      - uses: JavidDitty/setup-cintent@3e5b2faf83a2ad32c22a1cd0f86f5f20ea53a5ab
+
+      - name: Install dependencies
+        run: poetry install
+      - name: Run Unit Tests and Doctests Python ${{matrix.python_version}} ${{matrix.os}}
+        run: poetry run poe tests
+      - name: Run mypy type check Python ${{matrix.python_version}} ${{matrix.os}}
+        run: poetry run poe type_check
+      - name: Generate dependency tree
+        run: |
+          export DEPS='dependencies_${{matrix.python_version}}_${{matrix.os}}.txt'
+          echo "${{matrix.python_version}} ${{matrix.os}}" > $DEPS
+          poetry run pipdeptree >> $DEPS
+        shell: bash
+
+      # CINTENT >> REMOVE_UPLOAD
+      # - name: Archive dependency tree
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: dependencies-${{matrix.python_version}}-${{matrix.os}}
+      #     path: |
+      #       dependencies_${{matrix.python_version}}_${{matrix.os}}.txt
+
+      # CINTENT >> INSERT_CINTENT
+      - name: Upload CIntent Artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ env.CINTENT_ARTIFACT_NAME }}
+          path: ${{ env.CINTENT_LOGS }}
+
+
+
+
